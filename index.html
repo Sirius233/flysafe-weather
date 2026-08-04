@@ -222,17 +222,18 @@ const NMC_NAMES = {
 // ADVERSE WEATHER ANALYSIS (loaded from data/adverse-weather.js)
 // ============================================================
 const WEATHER_SECTIONS = {
-  TS: { kw: ['TS','TSRA','-TSRA','CB','+TSRA','+SHRA'], title: '雷暴', section: '---\\n二、', endSection: /^---\\n三、/m },
-  TURB: { kw: ['TURB'], title: '颠簸', section: '---\\n三、', endSection: /^---\\n四、/m },
-  WS: { kw: ['WS','WIND SHEAR'], title: '风切变', section: '---\\n四、', endSection: /^---\\n五、/m },
-  FG: { kw: ['BR','FG','MIFG','BCFG','PRFG'], title: '低能见度', section: '---\\n五、', endSection: /^---\\n六、/m },
-  ICE: { kw: ['ICE','FZDZ','FZRA','FZFG'], title: '结冰/寒冷天气', section: '---\\n六、', endSection: /^---\\n七、/m },
-  GR: { kw: ['GR'], title: '冰雹（参见雷暴）', section: '---\\n二、', endSection: /^---\\n三、/m },
-  SQ: { kw: ['SQ'], title: '飑线（雷暴+风切变）', section: '---\\n二、', endSection: /^---\\n三、/m },
+  TS: { kw: ['TS','TSRA','-TSRA','+TSRA','RETS','CB','SHRA','-SHRA','+SHRA','RA','-RA','+RA','DZ','-DZ','+DZ','SN','-SN','+SN','SG','GS','PL','GR','SQ','VCTS','VCSH'], title: '雷暴/降水', section: '二、雷暴', endSection: /^三、/m },
+  TURB: { kw: ['TURB'], title: '颠簸', section: '三、', endSection: /^四、/m },
+  WS: { kw: ['WS','WIND SHEAR'], title: '风切变', section: '四、', endSection: /^五、/m },
+  FG: { kw: ['BR','FG','MIFG','BCFG','PRFG','HZ','FU','DU','SA','VA'], title: '低能见度', section: '五、', endSection: /^六、/m },
+  ICE: { kw: ['ICE','FZDZ','FZRA','FZFG','BLSN','BLSA','BLDU'], title: '结冰/寒冷天气', section: '六、', endSection: /^七、/m },
 };
+const dangerKeywords = ['+TSRA','+SHRA','GR','SQ'];
 
 function getWeatherDoc() {
-  return window.ADVERSE_WEATHER || '';
+  let doc = window.ADVERSE_WEATHER || '';
+  // Normalize \r\n to \n for section marker matching
+  return doc.replace(/\r\n/g, '\n');
 }
 
 function extractSection(doc, startMarker, endRegex) {
@@ -251,7 +252,7 @@ function detectWeather(raw) {
   const seen = new Set();
   for (const [key, cfg] of Object.entries(WEATHER_SECTIONS)) {
     const matched = cfg.kw.some(kw => {
-      const re = new RegExp('\\b' + kw.replace(/[+#-]/g, '\\$&') + '\\b', 'i');
+      const re = new RegExp('(^|\\s)' + kw.replace(/[+#-]/g, '\\$&') + '(\\s|$)', 'i');
       return re.test(upper);
     });
     if (matched && !seen.has(key)) {
@@ -339,6 +340,16 @@ async function fetchMetar(icao) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = 'data/metar.js?_=' + Date.now();
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    // Ensure adverse weather doc is loaded
+    if (!window.ADVERSE_WEATHER) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'data/adverse-weather.js?_=' + Date.now();
         s.onload = resolve;
         s.onerror = reject;
         document.head.appendChild(s);
@@ -607,7 +618,6 @@ function statusDot(level) {
 // RENDER
 // ============================================================
 function renderAirportSection(city, metarFields, tafData, weatherHits, isDual) {
-  const dangerKeywords = ['+TSRA','+SHRA','GR','SQ'];
   const isDangerHit = (h) => dangerKeywords.some(k => h.name.includes(k));
   const level = weatherHits.length > 0 ? (weatherHits.some(isDangerHit) ? 'danger' : 'caution') : 'good';
   const dot = statusDot(level);
