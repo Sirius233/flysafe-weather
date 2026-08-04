@@ -725,17 +725,8 @@ function render() {
     }
   }
 
-  if (allHits.length > 0) {
-    html += '<div class="card"><h2>⚠️ 不利天气分析</h2>';
-    for (const hit of allHits) {
-      html += '<h3 style="color:var(--red);">' + hit.name + '</h3>';
-      html += '<div class="alert alert-danger" style="white-space:pre-wrap;font-size:12px;line-height:1.8;">' + hit.content.replace(/\r\n/g,'\n').replace(/\n/g,'<br>') + '</div>';
-    }
-    html += '</div>';
-  }
-
-  // Summary
-  html += '<div class="card summary-card"><h2>总结</h2>';
+  // Summary + Adverse Weather Analysis combined
+  html += '<div class="card"><h2>总结</h2>';
   for (let i = 0; i < airportResults.length; i++) {
     const r = airportResults[i];
     if (!r) continue;
@@ -748,7 +739,16 @@ function render() {
       status = isDanger ? '🔴' : '🟡';
       desc = r.weatherHits.map(h => h.name).join('、');
     }
-    html += '<div class="airport-summary">' + status + ' <strong>' + r.city.name + ' ' + r.city.icao + '</strong>：' + desc + '</div>';
+    html += '<p style="font-size:16px;font-weight:600;margin:8px 0;">' + status + ' ' + r.city.name + ' ' + r.city.icao + '：' + desc + '</p>';
+  }
+
+  // Embed adverse weather document analysis in summary
+  if (allHits.length > 0) {
+    html += '<h3 style="margin-top:16px;color:var(--red);text-transform:none;text-align:left;">⚠️ 不利天气分析</h3>';
+    for (const hit of allHits) {
+      html += '<h3 style="color:var(--red);text-transform:none;text-align:left;">' + hit.name + '</h3>';
+      html += '<div class="alert alert-danger" style="white-space:pre-wrap;font-size:12px;line-height:1.8;">' + hit.content.replace(/\r\n/g,'\n').replace(/\n/g,'<br>') + '</div>';
+    }
   }
   html += '</div>';
 
