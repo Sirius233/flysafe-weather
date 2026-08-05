@@ -298,6 +298,25 @@ function selectCity(n, icao) {
   if (n === 1) selected1 = city;
 }
 
+// Reset button + clear results when user types a new airport in the input
+function resetQueryUI() {
+  const btn = document.getElementById('btn-query');
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  setProgress(-1, '查询天气');
+  const pct = document.getElementById('btn-pct');
+  if (pct) pct.textContent = '';
+  const fill = document.getElementById('btn-progress-fill');
+  if (fill) fill.style.width = '0%';
+  const results = document.getElementById('results');
+  results.classList.remove('show');
+  results.innerHTML = '';
+}
+
+document.getElementById('input1').addEventListener('input', function() {
+  resetQueryUI();
+});
+
 // Close dropdowns on outside click
 document.addEventListener('click',function(e) {
   if (!e.target.closest('.selector')) {
