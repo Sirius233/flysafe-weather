@@ -78,7 +78,6 @@ body {
 .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #2563eb, #06b6d4); border-radius: 5px; transition: width .5s ease; position: relative; overflow: hidden; }
 .progress-bar::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 1.2s infinite; }
 @keyframes shine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-.progress-label { display: block; text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 6px; letter-spacing: .5px; }
 
 /* Results */
 .results { display: none; }
@@ -172,7 +171,6 @@ body {
     </button>
     <div class="progress-wrap" id="progress-wrap">
       <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
-      <span class="progress-label" id="progress-label"></span>
     </div>
   </div>
 
@@ -810,16 +808,13 @@ let airportResults = [];
 // Progress control
 function setProgress(pct, label) {
   const bar = document.getElementById('progress-bar');
-  const lab = document.getElementById('progress-label');
   const wrap = document.getElementById('progress-wrap');
   const txt = document.getElementById('btn-text');
   if (pct >= 0 && pct < 100) {
     wrap.classList.add('show');
     bar.style.width = pct + '%';
-    lab.textContent = label;
   } else if (pct === 100) {
     bar.style.width = '100%';
-    lab.textContent = label;
     setTimeout(() => wrap.classList.remove('show'), 1200);
   }
   if (label && txt) txt.textContent = label;
