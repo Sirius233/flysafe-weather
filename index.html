@@ -314,6 +314,8 @@ function resetQueryUI() {
 }
 
 document.getElementById('input1').addEventListener('input', function() {
+  // User is typing a new airport - clear previous selection to avoid stale queries
+  selected1 = null;
   resetQueryUI();
 });
 
