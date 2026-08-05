@@ -901,25 +901,32 @@ function setProgress(pct, label) {
   if (label && txt) txt.textContent = label;
 }
 
+// Resolve the airport from the current input value (no reliance on stored state)
+function airportFromInput() {
+  const inputVal = document.getElementById('input1').value.trim();
+  if (!inputVal) return null;
+  // Exact match: "name ICAO" or "ICAO" or just "name"
+  return CITIES.find(c =>
+    inputVal === c.name + ' ' + c.icao ||
+    inputVal === c.icao ||
+    inputVal === c.name
+  ) || null;
+}
+
 async function query() {
   const btn = document.getElementById('btn-query');
   if (btn.disabled) return;
 
-  if (!selected1) {
-    alert('请先选择机场');
-    return;
-  }
-
-  // Verify the displayed input value matches the selected airport.
-  // This guards against stale selections (e.g. IME input not firing 'input' events).
-  const inputVal = document.getElementById('input1').value.trim();
-  if (inputVal !== selected1.name + ' ' + selected1.icao) {
+  // Source of truth: the visible input value. No more selected1 state mismatches.
+  const city = airportFromInput();
+  if (!city) {
     selected1 = null;
     alert('请从下拉列表中选择机场');
     return;
   }
+  selected1 = city;
 
-  const cities = [selected1];
+  const cities = [city];
 
   const icaoCodes = cities.map(c => c.icao).join(',');
 
