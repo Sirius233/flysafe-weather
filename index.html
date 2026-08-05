@@ -361,27 +361,54 @@ async function fetchMetar(icao) {
       if (lines.length > 0) return lines.join('\n');
     }
   } catch(e) {}
-  // Fallback: try direct
-  const url = 'https://aviationweather.gov/api/data/metar?ids=' + icao + '&taf=true';
+  // ---- Live multi-source fallback (when local cache misses) ----
+  // Source 1: aviationweather.gov direct
   try {
-    const resp = await fetch(url);
-    if (resp.ok) return await resp.text();
+    const resp = await fetch('https://aviationweather.gov/api/data/metar?ids=' + icao + '&taf=true');
+    if (resp.ok) {
+      const t = await resp.text();
+      if (t && t.trim()) return t;
+    }
   } catch(e) {}
-  // Fallback: CORS proxies
-  const proxies = [
-    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-    u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u)
+  // Source 2: NOAA tgftp via CORS proxy
+  const proxyUrls = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://api.codetabs.com/v1/proxy?quest='
   ];
-  let lastErr = null;
-  for (const make of proxies) {
+  for (const make of proxyUrls) {
     try {
-      const resp = await fetch(make(url));
-      if (resp.ok) return await resp.text();
-      lastErr = new Error('HTTP ' + resp.status);
-    } catch(e) { lastErr = e; }
+      const resp = await fetch(make + encodeURIComponent('https://tgftp.nws.noaa.gov/data/observations/metar/stations/' + icao + '.TXT'));
+      if (resp.ok) {
+        const t = await resp.text();
+        const lines = t.trim().split('\n');
+        const metarLine = lines.find(l => /^[A-Z]{4}\s\d{6}Z/.test(l.trim()));
+        if (metarLine) {
+          let out = 'METAR ' + metarLine.trim();
+          // Try to append TAF too
+          try {
+            const tafResp = await fetch(make + encodeURIComponent('https://tgftp.nws.noaa.gov/data/forecasts/taf/stations/' + icao + '.TXT'));
+            if (tafResp.ok) {
+              const tt = await tafResp.text();
+              const tafLines = tt.trim().split('\n');
+              const tafStart = tafLines.findIndex(l => l.trim().startsWith('TAF'));
+              if (tafStart >= 0) {
+                let tafBlock = tafLines[tafStart].trim();
+                for (let j = tafStart + 1; j < tafLines.length; j++) {
+                  const l = tafLines[j];
+                  if (l.trim() === '' || /^\s{2,}/.test(l)) tafBlock += '\n' + l.trim();
+                  else break;
+                }
+                out += '\n' + tafBlock;
+              }
+            }
+          } catch(e2) {}
+          return out;
+        }
+      }
+    } catch(e) {}
   }
-  throw lastErr || new Error('所有代理失败');
+  throw new Error('所有数据源均无法获取 ' + icao + ' 的报文');
 }
 
 // ATIS fetch via free public API (datis.clowd.io) - with timeout to avoid hanging
