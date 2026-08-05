@@ -317,6 +317,11 @@ function resetQueryUI() {
 }
 
 document.getElementById('input1').addEventListener('input', function() {
+  // If the value matches the currently selected airport (set by selectCity), keep the selection
+  if (selected1 && this.value === selected1.name + ' ' + selected1.icao) {
+    resetQueryUI();
+    return;
+  }
   // User is typing a new airport - clear previous selection to avoid stale queries
   selected1 = null;
   resetQueryUI();
@@ -902,6 +907,15 @@ async function query() {
 
   if (!selected1) {
     alert('请先选择机场');
+    return;
+  }
+
+  // Verify the displayed input value matches the selected airport.
+  // This guards against stale selections (e.g. IME input not firing 'input' events).
+  const inputVal = document.getElementById('input1').value.trim();
+  if (inputVal !== selected1.name + ' ' + selected1.icao) {
+    selected1 = null;
+    alert('请从下拉列表中选择机场');
     return;
   }
 
