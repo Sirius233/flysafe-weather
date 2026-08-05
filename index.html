@@ -463,11 +463,11 @@ function extractMetarFields(metar) {
   }
   // AUTO
   if (idx < parts.length && parts[idx] === 'AUTO') idx++;
-  // Wind
-  const windIdx = parts.findIndex((p,i) => i >= idx && /^\d{5}(G\d{2,3})?(MPS|KT|KPH)$/i.test(p));
+  // Wind - support VRB (variable) + speed, 5-digit, or ///// unknown
+  const windIdx = parts.findIndex((p,i) => i >= idx && /^(VRB\d{2,3}|\d{5}|[\/]{3,5})(G\d{2,3})?(MPS|KT|KPH)$/i.test(p));
   if (windIdx >= idx) {
     fields.wind = parts[windIdx];
-    // Weather between wind and idx
+    // Visibility values appearing before the wind token (rare)
     const wxParts = [];
     for (let i = idx; i < windIdx; i++) {
       if (parts[i] !== 'AUTO') wxParts.push(parts[i]);
