@@ -168,50 +168,9 @@ body {
 
 <script>
 // ============================================================
-// CITY DATA (40 airports)
+// CITY DATA (loaded from data/airports.js - 160+ airports)
 // ============================================================
-const CITIES = [
-  {name:'北京',icao:'ZBAA',lat:40.08,lon:116.58,nmc:'huabei',airport:'首都',intl:false},
-  {name:'上海浦东',icao:'ZSPD',lat:31.14,lon:121.79,nmc:'huadong',airport:'浦东',intl:false},
-  {name:'上海虹桥',icao:'ZSSS',lat:31.20,lon:121.34,nmc:'huadong',airport:'虹桥',intl:false},
-  {name:'广州',icao:'ZGGG',lat:23.39,lon:113.31,nmc:'huanan',airport:'白云',intl:false},
-  {name:'深圳',icao:'ZGSZ',lat:22.64,lon:113.81,nmc:'huanan',airport:'宝安',intl:false},
-  {name:'成都',icao:'ZUUU',lat:30.58,lon:103.95,nmc:'xinan',airport:'双流',intl:false},
-  {name:'重庆',icao:'ZUCK',lat:29.72,lon:106.64,nmc:'xinan',airport:'江北',intl:false},
-  {name:'杭州',icao:'ZSHC',lat:30.23,lon:120.43,nmc:'huadong',airport:'萧山',intl:false},
-  {name:'南京',icao:'ZSNJ',lat:31.74,lon:118.86,nmc:'huadong',airport:'禄口',intl:false},
-  {name:'武汉',icao:'ZHHH',lat:30.78,lon:114.21,nmc:'huazhong',airport:'天河',intl:false},
-  {name:'西安',icao:'ZLXY',lat:34.44,lon:108.75,nmc:'xibei',airport:'咸阳',intl:false},
-  {name:'厦门',icao:'ZSAM',lat:24.48,lon:118.09,nmc:'huanan',airport:'高崎',intl:false},
-  {name:'郑州',icao:'ZHCC',lat:34.52,lon:113.84,nmc:'huazhong',airport:'新郑',intl:false},
-  {name:'天津',icao:'ZBTJ',lat:39.12,lon:117.35,nmc:'huabei',airport:'滨海',intl:false},
-  {name:'大连',icao:'ZYTL',lat:38.97,lon:121.54,nmc:'dongbei',airport:'周水子',intl:false},
-  {name:'沈阳',icao:'ZYTX',lat:41.64,lon:123.48,nmc:'dongbei',airport:'桃仙',intl:false},
-  {name:'哈尔滨',icao:'ZYHB',lat:45.62,lon:126.25,nmc:'dongbei',airport:'太平',intl:false},
-  {name:'长春',icao:'ZYCC',lat:43.90,lon:125.22,nmc:'dongbei',airport:'龙嘉',intl:false},
-  {name:'太原',icao:'ZBYN',lat:37.75,lon:112.63,nmc:'huabei',airport:'武宿',intl:false},
-  {name:'三亚',icao:'ZJSY',lat:18.30,lon:109.41,nmc:'huanan',airport:'凤凰',intl:false},
-  {name:'海口',icao:'ZJHK',lat:19.93,lon:110.46,nmc:'huanan',airport:'美兰',intl:false},
-  {name:'昆明',icao:'ZPPP',lat:25.10,lon:102.74,nmc:'xinan',airport:'长水',intl:false},
-  {name:'贵阳',icao:'ZUGY',lat:26.54,lon:106.80,nmc:'xinan',airport:'龙洞堡',intl:false},
-  {name:'长沙',icao:'ZGHA',lat:28.19,lon:113.22,nmc:'huazhong',airport:'黄花',intl:false},
-  {name:'乌鲁木齐',icao:'ZWWW',lat:43.91,lon:87.47,nmc:'xibei',airport:'地窝堡',intl:false},
-  {name:'兰州',icao:'ZLLL',lat:36.52,lon:103.62,nmc:'xibei',airport:'中川',intl:false},
-  {name:'济南',icao:'ZSJN',lat:36.86,lon:117.22,nmc:'huadong',airport:'遥墙',intl:false},
-  {name:'青岛',icao:'ZSQD',lat:36.27,lon:120.37,nmc:'huadong',airport:'流亭',intl:false},
-  {name:'福州',icao:'ZSFZ',lat:25.94,lon:119.66,nmc:'huadong',airport:'长乐',intl:false},
-  {name:'南昌',icao:'ZSCN',lat:28.86,lon:115.90,nmc:'huadong',airport:'昌北',intl:false},
-  {name:'南宁',icao:'ZGNN',lat:22.61,lon:108.18,nmc:'huanan',airport:'吴圩',intl:false},
-  {name:'石家庄',icao:'ZBSJ',lat:38.28,lon:114.70,nmc:'huabei',airport:'正定',intl:false},
-  {name:'呼和浩特',icao:'ZBHH',lat:40.85,lon:111.82,nmc:'huabei',airport:'白塔',intl:false},
-  {name:'赤峰',icao:'ZBCF',lat:42.28,lon:118.92,nmc:'huabei',airport:'玉龙',intl:false,noMetar:true},
-  {name:'西双版纳',icao:'ZPJH',lat:21.97,lon:100.76,nmc:'xinan',airport:'嘎洒',intl:false,noMetar:true},
-  {name:'槟城',icao:'WMKP',lat:5.30,lon:100.28,nmc:null,airport:'马来西亚',intl:true},
-  {name:'新加坡',icao:'WSSS',lat:1.36,lon:103.99,nmc:null,airport:'樟宜',intl:true},
-  {name:'曼谷',icao:'VTBS',lat:13.69,lon:100.75,nmc:null,airport:'素万那普',intl:true},
-  {name:'东京',icao:'RJTT',lat:35.55,lon:139.78,nmc:null,airport:'羽田',intl:true},
-  {name:'首尔',icao:'RKSI',lat:37.46,lon:126.44,nmc:null,airport:'仁川',intl:true},
-];
+let CITIES = window.AIRPORTS || [];
 
 const NMC_NAMES = {
   huabei:'华北',huadong:'华东',huanan:'华南',huazhong:'华中',
@@ -317,44 +276,69 @@ function showDropdown(n) {
 function selectCity(n, icao) {
   const city = CITIES.find(c => c.icao === icao);
   document.getElementById('input'+n).value = city.name + ' ' + city.icao;
-  document.getElementById('dropdown'+n).classList.remove('show');
+  const dd = document.getElementById('dropdown'+n);
+  if (dd) dd.classList.remove('show');
   if (n === 1) selected1 = city;
-  else selected2 = city;
 }
 
 // Close dropdowns on outside click
 document.addEventListener('click',function(e) {
   if (!e.target.closest('.selector')) {
     document.getElementById('dropdown1').classList.remove('show');
-    document.getElementById('dropdown2').classList.remove('show');
   }
 });
 
 // ============================================================
 // API & PARSING
 // ============================================================
+// Global cache: indexed METAR data by ICAO (built once)
+let METAR_INDEX = null;
+
+function buildMetarIndex() {
+  if (METAR_INDEX || !window.METAR_DATA) return;
+  METAR_INDEX = {};
+  const lines = window.METAR_DATA.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^(METAR|SPECI|TAF)\s+([A-Z]{4})/);
+    if (m) {
+      const icao = m[2];
+      if (!METAR_INDEX[icao]) METAR_INDEX[icao] = [];
+      METAR_INDEX[icao].push(line.trim());
+    }
+  }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// Preload all data in parallel on page load
+function preloadData() {
+  const t = Date.now();
+  const jobs = [];
+  if (!window.AIRPORTS) jobs.push(loadScript('data/airports.js?_=' + t));
+  if (!window.METAR_DATA) jobs.push(loadScript('data/metar.js?_=' + t));
+  if (!window.ADVERSE_WEATHER) jobs.push(loadScript('data/adverse-weather.js?_=' + t));
+  Promise.all(jobs).then(() => {
+    buildMetarIndex();
+    if (window.AIRPORTS && CITIES.length === 0) {
+      CITIES = window.AIRPORTS;
+    }
+  }).catch(() => {});
+}
+
 async function fetchMetar(icao) {
-  // Primary: fetch from cached data JS file (no CORS needed, refreshed every 10min via GitHub Actions)
   try {
-    if (!window.METAR_DATA) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'data/metar.js?_=' + Date.now();
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-    // Ensure adverse weather doc is loaded
-    if (!window.ADVERSE_WEATHER) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'data/adverse-weather.js?_=' + Date.now();
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
+    if (!window.METAR_DATA) await loadScript('data/metar.js?_=' + Date.now());
+    if (!window.ADVERSE_WEATHER) await loadScript('data/adverse-weather.js?_=' + Date.now());
+    buildMetarIndex();
+    if (METAR_INDEX && METAR_INDEX[icao]) return METAR_INDEX[icao].join('\n');
     if (window.METAR_DATA) {
       const lines = window.METAR_DATA.split('\n').filter(l => l.includes(icao) && l.trim());
       if (lines.length > 0) return lines.join('\n');
@@ -381,6 +365,39 @@ async function fetchMetar(icao) {
     } catch(e) { lastErr = e; }
   }
   throw lastErr || new Error('所有代理失败');
+}
+
+// ATIS fetch via free public API (datis.clowd.io)
+async function fetchAtis(icao) {
+  const urls = [
+    'https://datis.clowd.io/api/' + icao,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://datis.clowd.io/api/' + icao),
+    'https://corsproxy.io/?' + encodeURIComponent('https://datis.clowd.io/api/' + icao)
+  ];
+  for (const u of urls) {
+    try {
+      const resp = await fetch(u);
+      if (resp.ok) {
+        const j = await resp.json();
+        if (j && j.atis && j.atis.length > 0) return j.atis;
+      }
+    } catch(e) {}
+  }
+  return null;
+}
+
+function formatAtis(atisList) {
+  if (!atisList || atisList.length === 0) return '<div class="alert alert-danger">ATIS 数据暂不可用</div>';
+  let html = '';
+  for (const a of atisList) {
+    const type = (a.type || 'ATIS').toUpperCase();
+    const ident = a.ident ? '（' + a.ident + '）' : '';
+    const raw = (a.datis || a.text || '').trim();
+    const time = a.timestamp ? ' · 更新 ' + utcToBeijing(a.timestamp.split('T')[1] ? a.timestamp : a.timestamp) : '';
+    html += '<div class="code-block">' + (raw.replace(/\n/g,'<br>') || '暂无内容') + '</div>';
+    if (raw) html += '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + type + ' ' + ident + ' ' + time + '</div>';
+  }
+  return html;
 }
 
 function parseMetar(raw) {
@@ -617,12 +634,13 @@ function statusDot(level) {
 // ============================================================
 // RENDER
 // ============================================================
-function renderAirportSection(city, metarFields, tafData, weatherHits, isDual) {
+function renderAirportSection(city, metarFields, tafData, weatherHits, isDual, atisData) {
   const isDangerHit = (h) => dangerKeywords.some(k => h.name.includes(k));
   const level = weatherHits.length > 0 ? (weatherHits.some(isDangerHit) ? 'danger' : 'caution') : 'good';
   const dot = statusDot(level);
   const nmc = nmcUrl(city.nmc);
-  const hasMetar = !city.noMetar;
+  // Dynamically determine if METAR is available (data may not cover regional airports)
+  const hasMetar = !!metarFields;
 
   let html = '<div class="card">';
   html += '<h2>' + dot + ' ' + city.name + ' ' + city.icao + ' · ' + city.airport + '</h2>';
@@ -643,10 +661,7 @@ function renderAirportSection(city, metarFields, tafData, weatherHits, isDual) {
   // METAR
   if (!hasMetar) {
     html += '<h3>⚠️ METAR/TAF 不可用</h3>';
-    html += '<div class="alert alert-danger">' + city.name + city.airport + '为支线机场，不在 aviationweather.gov 覆盖范围。请参考上方 Windy 雷达与风场进行天气评估。</div>';
-  } else if (!metarFields) {
-    html += '<h3>⚠️ 暂无报文数据</h3>';
-    html += '<div class="alert alert-danger">未能获取 ' + city.icao + ' 的 METAR/TAF 数据，请稍后重试。</div>';
+    html += '<div class="alert alert-danger">' + city.name + city.airport + '暂无 METAR/TAF 报文数据（支线机场或数据源未覆盖）。请参考上方雷达图进行天气评估。</div>';
   } else {
     // METAR
     html += '<h3>📡 METAR 报</h3>';
@@ -703,6 +718,13 @@ function renderAirportSection(city, metarFields, tafData, weatherHits, isDual) {
     }
   }
 
+  // ATIS
+  html += '<h3>📢 ATIS 通播</h3>';
+  if (atisData) {
+    html += '<div class="code-block">' + (atisData.replace(/\n/g,'<br>') || '暂无内容') + '</div>';
+  } else {
+    html += '<div class="alert alert-success">ATIS 数据暂不可用或该机场未提供。</div>';
+  }
   html += '</div>';
   return { html, level, weatherHits };
 }
@@ -719,7 +741,7 @@ function render() {
   // Render airport 1
   const r1 = airportResults[0];
   if (r1) {
-    const rendered = renderAirportSection(r1.city, r1.metarFields, r1.tafData, r1.weatherHits);
+    const rendered = renderAirportSection(r1.city, r1.metarFields, r1.tafData, r1.weatherHits, false, r1.atis);
     html += rendered.html;
   }
 
@@ -740,10 +762,10 @@ function render() {
   for (let i = 0; i < airportResults.length; i++) {
     const r = airportResults[i];
     if (!r) continue;
-    const hasMetar = !r.city.noMetar;
+    const hasMetar = !!r.metarFields;
     let status = '🟢', desc = '天气晴好';
-    if (!hasMetar && r.city.noMetar) {
-      status = '🟡'; desc = '支线机场，METAR 不可用，请参考 Windy';
+    if (!hasMetar) {
+      status = '🟡'; desc = '暂无 METAR 数据，请参考雷达图';
     } else if (r.weatherHits.length > 0) {
       const isDanger = r.weatherHits.some(h => dangerKeywords.some(k => h.name.includes(k)));
       status = isDanger ? '🔴' : '🟡';
@@ -787,10 +809,14 @@ async function query() {
 
   try {
     let raw = '';
-    try {
-      raw = await fetchMetar(icaoCodes);
-    } catch(e) {
-      document.getElementById('results').innerHTML = '<div class="card"><div class="error-msg">获取气象数据失败：' + e.message + '。请检查网络后重试。</div></div>';
+    // Fetch METAR and ATIS in parallel
+    const [metarResult, atisResult] = await Promise.allSettled([
+      fetchMetar(icaoCodes),
+      fetchAtis(selected1.icao)
+    ]);
+    if (metarResult.status === 'fulfilled') raw = metarResult.value;
+    else {
+      document.getElementById('results').innerHTML = '<div class="card"><div class="error-msg">获取气象数据失败：' + metarResult.reason.message + '。请检查网络后重试。</div></div>';
       document.getElementById('results').classList.add('show');
       btn.classList.remove('loading');
       btn.disabled = false;
@@ -818,7 +844,7 @@ async function query() {
       const allRaw = (parsed ? (parsed.metar||'') + ' ' + (parsed.taf||'') : block);
       const weatherHits = detectWeather(allRaw);
 
-      airportResults.push({ city, metarFields, tafData, weatherHits });
+      airportResults.push({ city, metarFields, tafData, weatherHits, atis: (atisResult.status === 'fulfilled' && atisResult.value && atisResult.value.length > 0) ? atisResult.value[0].datis || atisResult.value[0].text || atisResult.value[0].metar || 'ATIS' : null });
     }
 
     render();
@@ -830,8 +856,9 @@ async function query() {
   }
 }
 
-// Initialize
-// Initialize
+// Initialize - preload data in background for instant queries
+preloadData();
+
 // ============================================================
 // SPACE BACKGROUND - stars + real-time Earth from space
 // ============================================================
