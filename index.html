@@ -439,6 +439,18 @@ function parseMetar(raw) {
   return result;
 }
 
+// Check if a METAR timestamp (e.g. "111700Z" = day 11, 17:00 UTC) is fresh
+function isMetarFresh(metarTime) {
+  const m = metarTime && metarTime.match(/^(\d{2})(\d{2})(\d{2})Z$/);
+  if (!m) return true; // unknown format - don't filter
+  const day = parseInt(m[1], 10), hh = parseInt(m[2], 10), mm = parseInt(m[3], 10);
+  const now = new Date();
+  let cand = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), day, hh, mm));
+  if (cand > now) cand = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, day, hh, mm));
+  const diffHours = (now - cand) / 3600000;
+  return diffHours <= 24; // fresh if within 24h
+}
+
 function extractMetarFields(metar) {
   if (!metar) return null;
   const parts = metar.split(/\s+/);
@@ -663,13 +675,13 @@ function statusDot(level) {
 // ============================================================
 // RENDER
 // ============================================================
-function renderAirportSection(city, metarFields, tafData, weatherHits, isDual, atisData) {
+function renderAirportSection(city, metarFields, tafData, weatherHits, isDual, atisData, metarStale) {
   const isDangerHit = (h) => dangerKeywords.some(k => h.name.includes(k));
   const level = weatherHits.length > 0 ? (weatherHits.some(isDangerHit) ? 'danger' : 'caution') : 'good';
   const dot = statusDot(level);
   const nmc = nmcUrl(city.nmc);
   // Dynamically determine if METAR is available (data may not cover regional airports)
-  const hasMetar = !!metarFields;
+  const hasMetar = !!metarFields && !metarStale;
 
   let html = '<div class="card">';
   html += '<h2>' + dot + ' ' + city.name + ' ' + city.icao + ' · ' + city.airport + '</h2>';
@@ -690,7 +702,11 @@ function renderAirportSection(city, metarFields, tafData, weatherHits, isDual, a
   // METAR
   if (!hasMetar) {
     html += '<h3>⚠️ METAR/TAF 不可用</h3>';
-    html += '<div class="alert alert-danger">' + city.name + city.airport + '暂无 METAR/TAF 报文数据（支线机场或数据源未覆盖）。请参考上方雷达图进行天气评估。</div>';
+    if (metarStale) {
+      html += '<div class="alert alert-danger">' + city.name + city.airport + ' 的 METAR 报文已过期（该机场可能已停止向国际数据交换发布报文）。请参考上方雷达图进行天气评估。</div>';
+    } else {
+      html += '<div class="alert alert-danger">' + city.name + city.airport + '暂无 METAR/TAF 报文数据（支线机场或数据源未覆盖）。请参考上方雷达图进行天气评估。</div>';
+    }
   } else {
     // METAR
     html += '<h3>📡 METAR 报</h3>';
@@ -766,7 +782,7 @@ function render() {
   // Render airport 1
   const r1 = airportResults[0];
   if (r1) {
-    const rendered = renderAirportSection(r1.city, r1.metarFields, r1.tafData, r1.weatherHits, false, r1.atis);
+    const rendered = renderAirportSection(r1.city, r1.metarFields, r1.tafData, r1.weatherHits, false, r1.atis, r1.metarStale);
     html += rendered.html;
   }
 
@@ -787,7 +803,7 @@ function render() {
   for (let i = 0; i < airportResults.length; i++) {
     const r = airportResults[i];
     if (!r) continue;
-    const hasMetar = !!r.metarFields;
+    const hasMetar = !!r.metarFields && !r.metarStale;
     let status = '🟢', desc = '天气晴好';
     if (!hasMetar) {
       status = '🟡'; desc = '暂无 METAR 数据，请参考雷达图';
@@ -882,12 +898,14 @@ async function query() {
       const parsed = parseMetar(block);
       const metarFields = parsed && parsed.metar ? extractMetarFields(parsed.metar) : null;
       const tafData = parsed && parsed.taf ? parseTaf(parsed.taf) : null;
+      // Flag stale METAR data (e.g. some regional airports stop publishing internationally)
+      const metarStale = !!(metarFields && metarFields.time && !isMetarFresh(metarFields.time));
 
       const allRaw = (parsed ? (parsed.metar||'') + ' ' + (parsed.taf||'') : block);
       setProgress(75 + i * 5, '正在分析不利天气…');
       const weatherHits = detectWeather(allRaw);
 
-      airportResults.push({ city, metarFields, tafData, weatherHits, atis: null });
+      airportResults.push({ city, metarFields, tafData, weatherHits, atis: null, metarStale });
     }
 
     setProgress(90, '生成结果…');
