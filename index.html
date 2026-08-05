@@ -157,6 +157,18 @@ body {
 </style>
 </head>
 <body>
+<script>
+  // Force-bypass any browser/webview cache by redirecting once with a unique URL
+  (function() {
+    try {
+      var u = new URL(location.href);
+      if (!u.searchParams.has('_')) {
+        u.searchParams.set('_', String(Date.now()));
+        location.replace(u.toString());
+      }
+    } catch (e) {}
+  })();
+</script>
 <div id="space-bg"><canvas id="stars"></canvas></div>
 <div class="container">
   <div class="header">
