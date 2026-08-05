@@ -315,6 +315,8 @@ function selectCity(n, icao) {
 
 // Reset button + clear results when user types a new airport in the input
 function resetQueryUI() {
+  queryToken++; // invalidate any in-flight query
+  airportResults = [];
   const btn = document.getElementById('btn-query');
   btn.classList.remove('loading');
   btn.disabled = false;
@@ -902,6 +904,7 @@ function render() {
 // MAIN QUERY
 // ============================================================
 let airportResults = [];
+let queryToken = 0; // invalidates stale in-flight queries
 
 // Progress control (integrated into button)
 function setProgress(pct, label) {
@@ -929,6 +932,10 @@ async function query() {
   const btn = document.getElementById('btn-query');
   if (btn.disabled) return;
 
+  // Request token: invalidates any in-flight query when a new one starts.
+  const myToken = ++queryToken;
+  airportResults = []; // always start with a clean result set
+
   // Source of truth: the visible input value. No more selected1 state mismatches.
   const city = airportFromInput();
   if (!city) {
@@ -951,6 +958,7 @@ async function query() {
     // Fetch METAR first - ATIS fetched async afterwards (does not block results)
     setProgress(20, '正在获取 METAR/TAF 报文…');
     const metarResult = await fetchMetar(icaoCodes).then(v => ({status:'fulfilled', value:v}), e => ({status:'rejected', reason:e}));
+    if (myToken !== queryToken) return; // superseded by a newer query - discard
     if (metarResult.status === 'fulfilled') raw = metarResult.value;
     else {
       document.getElementById('results').innerHTML = '<div class="card"><div class="error-msg">获取气象数据失败：' + metarResult.reason.message + '。请检查网络后重试。</div></div>';
@@ -966,6 +974,7 @@ async function query() {
 
     // Split by airport
     setProgress(68, '解析报文数据…');
+    if (myToken !== queryToken) return; // superseded - discard
     const blocks = raw.split(/\n/)
       .filter(l => l.trim())
       .join('\n')
@@ -993,12 +1002,16 @@ async function query() {
     }
 
     setProgress(90, '生成结果…');
+    if (myToken !== queryToken) return; // superseded - discard
     render();
     setProgress(100, '✅ 查询完成');
 
     // Fetch ATIS asynchronously and update the ATIS section when ready
-    fetchAtis(selected1.icao).then(atisList => {
-      const el = document.getElementById('atis-' + selected1.icao);
+    const atisIcao = selected1.icao;
+    const atisToken = myToken;
+    fetchAtis(atisIcao).then(atisList => {
+      if (atisToken !== queryToken) return; // stale query - discard ATIS update
+      const el = document.getElementById('atis-' + atisIcao);
       if (!el) return;
       if (atisList && atisList.length > 0) {
         const a = atisList[0];
