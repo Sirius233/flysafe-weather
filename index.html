@@ -341,6 +341,17 @@ document.getElementById('input1').addEventListener('input', function() {
   resetQueryUI();
 });
 
+// Auto-clear the input when the user clicks/focuses it after a previous search
+document.getElementById('input1').addEventListener('focus', function() {
+  if (this.value) {
+    selected1 = null;
+    this.value = '';
+    resetQueryUI();
+    // Show the full airport list for quick browsing
+    showDropdown(1);
+  }
+});
+
 // Close dropdowns on outside click
 document.addEventListener('click',function(e) {
   if (!e.target.closest('.selector')) {
