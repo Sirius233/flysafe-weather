@@ -704,23 +704,23 @@ function utcToBeijing(utc) {
     const h = parseInt(utc.substring(3,5));
     const m = parseInt(utc.substring(5,7));
     const date = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), d, h, m));
-    date.setHours(date.getHours() + 8);
-    return date.getDate() + '日 ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+    date.setUTCHours(date.getUTCHours() + 8);
+    return date.getUTCDate() + '日 ' + String(date.getUTCHours()).padStart(2,'0') + ':' + String(date.getUTCMinutes()).padStart(2,'0');
   }
   if (/^\d{6}Z$/.test(utc)) {
     const d = parseInt(utc.substring(0,2));
     const h = parseInt(utc.substring(2,4));
     const m = parseInt(utc.substring(4,6));
     const date = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), d, h, m));
-    date.setHours(date.getHours() + 8);
-    return date.getDate() + '日 ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0') + ' 北京时';
+    date.setUTCHours(date.getUTCHours() + 8);
+    return date.getUTCDate() + '日 ' + String(date.getUTCHours()).padStart(2,'0') + ':' + String(date.getUTCMinutes()).padStart(2,'0') + ' 北京时';
   }
   if (/^\d{4}$/.test(utc)) {
     const d = parseInt(utc.substring(0,2));
     const h = parseInt(utc.substring(2,4));
     const date = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), d, h));
-    date.setHours(date.getHours() + 8);
-    return date.getDate() + '日 ' + String(date.getHours()).padStart(2,'0') + ' 时';
+    date.setUTCHours(date.getUTCHours() + 8);
+    return date.getUTCDate() + '日 ' + String(date.getUTCHours()).padStart(2,'0') + ' 时';
   }
   if (/^\d{4}\/\d{4}$/.test(utc)) {
     const from = utc.substring(0,4);
@@ -729,10 +729,10 @@ function utcToBeijing(utc) {
     const td = parseInt(to.substring(0,2)), th = parseInt(to.substring(2,4));
     const fDate = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), fd, fh));
     const tDate = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), td, th));
-    fDate.setHours(fDate.getHours() + 8);
-    tDate.setHours(tDate.getHours() + 8);
-    return fDate.getDate() + '日 ' + String(fDate.getHours()).padStart(2,'0') + ':00 – ' +
-           tDate.getDate() + '日 ' + String(tDate.getHours()).padStart(2,'0') + ':00 北京时';
+    fDate.setUTCHours(fDate.getUTCHours() + 8);
+    tDate.setUTCHours(tDate.getUTCHours() + 8);
+    return fDate.getUTCDate() + '日 ' + String(fDate.getUTCHours()).padStart(2,'0') + ':00 – ' +
+           tDate.getUTCDate() + '日 ' + String(tDate.getUTCHours()).padStart(2,'0') + ':00 北京时';
   }
   return utc;
 }
