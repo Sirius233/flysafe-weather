@@ -467,13 +467,18 @@ function extractMetarFields(metar) {
   const windIdx = parts.findIndex((p,i) => i >= idx && /^(VRB\d{2,3}|\d{5}|[\/]{3,5})(G\d{2,3})?(MPS|KT|KPH)$/i.test(p));
   if (windIdx >= idx) {
     fields.wind = parts[windIdx];
+    idx = windIdx + 1;
+    // Variable wind direction range (e.g. 010V080 / 020V080 / 140V190)
+    if (idx < parts.length && /^\d{3}V\d{3}$/.test(parts[idx])) {
+      fields.wind += ' ' + parts[idx];
+      idx++;
+    }
     // Visibility values appearing before the wind token (rare)
     const wxParts = [];
     for (let i = idx; i < windIdx; i++) {
       if (parts[i] !== 'AUTO') wxParts.push(parts[i]);
     }
     if (wxParts.length > 0) fields.visibility = wxParts.join(' ');
-    idx = windIdx + 1;
   }
   // Visibility
   let visParts = [];
