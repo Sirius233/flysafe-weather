@@ -144,14 +144,17 @@ body {
 /* Error */
 .error-msg { padding: 14px 18px; background: var(--red-bg); border: 1px solid #fecaca; border-radius: var(--radius-sm); color: #991b1b; font-size: 13px; }
 
-/* Health monitor banner */
-#health-banner { display: none; margin: 0 0 16px; }
+/* Health monitor banner - floating toast, never obscured */
+#health-banner { display: none; position: fixed; top: 12px; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 620px; z-index: 9999; margin: 0; }
 #health-banner.show { display: block; }
-.health-ok { background: var(--green-bg); border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; }
-.health-warn { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.7; }
+.health-ok { background: var(--green-bg); border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; box-shadow: var(--shadow-lg); }
+.health-warn { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.7; box-shadow: var(--shadow-lg); max-height: 70vh; overflow-y: auto; }
 .health-warn .h-title { font-weight: 600; display: block; margin-bottom: 4px; }
 .health-warn ul { margin: 0; padding-left: 18px; }
-.health-time { float: right; opacity: .6; font-size: 11px; }
+.health-time { display: block; margin-top: 6px; opacity: .6; font-size: 11px; }
+.health-close { position: absolute; top: 6px; right: 10px; background: none; border: none; font-size: 16px; color: inherit; opacity: .5; cursor: pointer; padding: 2px 6px; line-height: 1; }
+.health-close:hover { opacity: 1; }
+#health-banner > div { position: relative; }
 
 /* Responsive */
 @media (max-width: 600px) {
@@ -1112,15 +1115,16 @@ async function checkDataHealth(force) {
 
   // Render banner
   const nowStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const closeBtn = '<button class="health-close" onclick="this.closest(\'#health-banner\').className=\'\';this.closest(\'#health-banner\').innerHTML=\'\'">✕</button>';
   if (issues.length > 0) {
     banner.className = 'show';
-    banner.innerHTML = '<div class="health-warn"><span class="h-title">🔍 数据监控发现异常（' + issues.length + ' 项）</span><ul>' +
+    banner.innerHTML = '<div class="health-warn">' + closeBtn + '<span class="h-title">🔍 数据监控发现异常（' + issues.length + ' 项）</span><ul>' +
       issues.map(i => '<li>⚠️ ' + i + '</li>').join('') +
       '</ul><span class="health-time">检查时间 ' + nowStr + ' · 每 1 小时自动复查</span></div>';
   } else {
     banner.className = 'show';
     banner.innerHTML = '<div class="health-ok">✅ 数据源正常 · 最新 METAR：' + (latest ? utcToBeijing(latest) : 'N/A') +
-      ' · 检查时间 ' + nowStr + '<span style="float:right;opacity:.6;">每 1 小时自动复查</span></div>';
+      ' · 检查时间 ' + nowStr + '<span style="opacity:.6;float:right;">每 1 小时自动复查</span></div>';
     setTimeout(() => { banner.classList.remove('show'); banner.innerHTML = ''; }, 10000);
   }
 }
