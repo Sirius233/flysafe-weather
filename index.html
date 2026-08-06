@@ -234,6 +234,7 @@ const WEATHER_SECTIONS = {
   WS: { kw: ['WS','WIND SHEAR'], title: '风切变', section: '四、', endSection: /^五、/m },
   FG: { kw: ['BR','FG','MIFG','BCFG','PRFG','HZ','FU','DU','SA','VA'], title: '低能见度', section: '五、', endSection: /^六、/m },
   ICE: { kw: ['ICE','FZDZ','FZRA','FZFG','BLSN','BLSA','BLDU'], title: '结冰/寒冷天气', section: '六、', endSection: /^七、/m },
+  COLDTEMP: { kw: ['FZDZ','FZRA','FZFG'], title: '低温条件的高度表修正', section: '十二、低温', endSection: null },
 };
 const dangerKeywords = ['+TSRA','+SHRA','GR','SQ'];
 
@@ -247,6 +248,7 @@ function extractSection(doc, startMarker, endRegex) {
   const start = doc.indexOf(startMarker);
   if (start === -1) return '';
   const rest = doc.substring(start);
+  if (!endRegex) return rest; // no end marker -> to end of document
   const endMatch = rest.match(endRegex);
   if (endMatch) return rest.substring(0, endMatch.index);
   return rest;
@@ -1048,6 +1050,19 @@ async function query() {
       const allRaw = (parsed ? (parsed.metar||'') + ' ' + (parsed.taf||'') : block);
       setProgress(75 + i * 5, '正在分析不利天气…');
       const weatherHits = detectWeather(allRaw);
+
+      // Cold temperature correction trigger: OAT <= 3°C (M## means minus)
+      if (metarFields && metarFields.tempDew) {
+        const tMatch = metarFields.tempDew.match(/^(M?)(\d{1,2})\//);
+        if (tMatch) {
+          const tempVal = tMatch[1] ? -parseInt(tMatch[2], 10) : parseInt(tMatch[2], 10);
+          if (tempVal <= 3 && !weatherHits.find(h => h.name.includes('低温'))) {
+            const doc = getWeatherDoc();
+            const content = extractSection(doc, '十二、低温', null);
+            weatherHits.push({ name: '低温条件的高度表修正', content: content || '（文档未加载）' });
+          }
+        }
+      }
 
       airportResults.push({ city, metarFields, tafData, weatherHits, atis: null, metarStale });
     }
