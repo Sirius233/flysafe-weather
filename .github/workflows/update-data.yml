@@ -12,23 +12,105 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch METAR/TAF data
+        with:
+          ref: gh-pages
+      - name: Fetch METAR/TAF from multiple sources
         run: |
           mkdir -p data
-          ICAOS="ZBAA ZSPD ZSSS ZGGG ZGSZ ZUUU ZUCK ZSHC ZSNJ ZHHH ZLXY ZSAM ZHCC ZBTJ ZYTL ZYTX ZYHB ZYCC ZBYN ZJSY ZJHK ZPPP ZUGY ZGHA ZWWW ZLLL ZSJN ZSQD ZSFZ ZSCN ZGNN ZBSJ ZBHH ZBCF ZPJH WMKP WSSS VTBS RJTT RKSI"
-          curl -s "https://aviationweather.gov/api/data/metar?ids=${ICAOS}&taf=true&format=raw" -o data/metar.txt
-          # Convert to JS data file (GitHub Pages doesn't serve .txt well)
-          CONTENT=$(cat data/metar.txt | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
-          printf 'window.METAR_DATA = "%s";\n' "$CONTENT" > data/metar.js
-          echo "Generated $(wc -c < data/metar.js) bytes"
+          python3 << 'EOF'
+          import json, re, urllib.request, datetime
+
+          ICAOS = "ZBAA ZBAD ZBTJ ZBSJ ZBYN ZBDT ZBYC ZBHH ZBOW ZBCF ZBDS ZBTL ZBXL ZBLA ZBUL ZYTX ZYTL ZYCC ZYHB ZYYJ ZYMD ZYQQ ZYJM ZYHE ZYDD ZYJZ ZYCY ZSPD ZSSS ZSNJ ZSHC ZSWX ZSCG ZSNT ZSYA ZSXZ ZSLG ZSYN ZSNB ZSWZ ZSZS ZSLQ ZSYW ZSOF ZSFY ZSFZ ZSAM ZSQZ ZSWY ZSJN ZSQD ZSYT ZSWH ZSLY ZSJG ZSDY ZSWF ZSCN ZSGZ ZSGS ZSJD ZSYC ZSJJ ZHHH ZHYC ZHXF ZHSN ZHSY ZHCC ZHLY ZHNY ZGHA ZGDY ZGCD ZGGG ZGSZ ZGSD ZGOW ZGZJ ZGMX ZGNN ZGKL ZGZH ZGBH ZGWZ ZJHK ZJSY ZJQH ZUUU ZUTF ZUCK ZUWX ZUQJ ZPPP ZPLX ZPDL ZPJH ZPDQ ZPMS ZPNL ZUGY ZULS ZUNZ ZUBD ZUAL ZURK ZUMY ZUYB ZULZ ZUJZ ZUZH ZUNC ZUXC ZUDX ZLXY ZLYL ZLSN ZLLL ZLDH ZLJQ ZLXN ZLGL ZLIC ZWWW ZWSH ZWTN ZWAK ZWKL ZWKC ZWYN ZWKM ZWHM ZWAT ZWTK ZWTL WSSS VTBS RJTT RKSI WMKP".split()
+
+          def fetch(url, timeout=10):
+              req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as r:
+                      return r.read().decode('utf-8', errors='replace')
+              except Exception:
+                  return ''
+
+          def is_fresh(metar):
+              m = re.match(r'^[A-Z]{4}\s(\d{2})(\d{2})(\d{2})Z', metar)
+              if not m:
+                  return True
+              day, hh, mm = int(m.group(1)), int(m.group(2)), int(m.group(3))
+              now = datetime.datetime.utcnow()
+              cand = datetime.datetime(now.year, now.month, day, hh, mm)
+              if cand > now:
+                  if now.month == 1:
+                      cand = datetime.datetime(now.year - 1, 12, day, hh, mm)
+                  else:
+                      cand = datetime.datetime(now.year, now.month - 1, day, hh, mm)
+              return (now - cand).total_seconds() / 3600 <= 24
+
+          by_airport = {}
+
+          # Source 1: NOAA tgftp
+          for icao in ICAOS:
+              raw = fetch(f'https://tgftp.nws.noaa.gov/data/observations/metar/stations/{icao}.TXT')
+              lines = [l.strip() for l in raw.strip().split('\n') if l.strip()]
+              if len(lines) >= 2 and re.match(r'^[A-Z]{4}\s', lines[1]):
+                  metar = lines[1]
+                  if is_fresh(metar):
+                      by_airport.setdefault(icao, {})['metar'] = metar
+              raw = fetch(f'https://tgftp.nws.noaa.gov/data/forecasts/taf/stations/{icao}.TXT')
+              tlines = [l.strip() for l in raw.strip().split('\n')]
+              start = next((i for i, l in enumerate(tlines) if l.startswith('TAF')), -1)
+              if start >= 0:
+                  block = [tlines[start]]
+                  for l in tlines[start + 1:]:
+                      if l and (l.startswith('  ') or l.startswith('\t')):
+                          block.append(l.strip())
+                      else:
+                          break
+                  by_airport.setdefault(icao, {})['taf'] = '\n'.join(block)
+
+          # Source 2: aviationweather.gov (detailed TAF with BECMG)
+          for i in range(0, len(ICAOS), 30):
+              chunk = ','.join(ICAOS[i:i + 30])
+              raw = fetch(f'https://aviationweather.gov/api/data/metar?ids={chunk}&taf=true&format=raw')
+              for line in raw.strip().split('\n'):
+                  line = line.strip()
+                  m = re.match(r'^(METAR|SPECI|TAF)\s+([A-Z]{4})', line)
+                  if not m:
+                      continue
+                  icao = m.group(2)
+                  a = by_airport.setdefault(icao, {})
+                  if m.group(1) == 'TAF':
+                      a['taf'] = line  # aviationweather TAF is more detailed
+                  elif 'metar' not in a:
+                      metar = re.sub(r'^(METAR|SPECI)\s+', '', line)
+                      if is_fresh(metar):
+                          a['metar'] = metar
+
+          # Assemble
+          out_lines = []
+          for icao in ICAOS:
+              a = by_airport.get(icao)
+              if not a:
+                  continue
+              if a.get('metar'):
+                  out_lines.append('METAR ' + a['metar'])
+              if a.get('taf'):
+                  out_lines.append(a['taf'])
+
+          output = '\n'.join(out_lines)
+          with open('data/metar.txt', 'w', encoding='utf-8') as f:
+              f.write(output)
+          with open('data/metar.js', 'w', encoding='utf-8') as f:
+              f.write('window.METAR_DATA = ' + json.dumps(output) + ';\n')
+          print(f'Airports with fresh METAR: {len(by_airport)}')
+          print(f'Generated {len(output)} bytes')
+          EOF
       - name: Commit and push
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
-          git add data/metar.txt
+          git add data/metar.txt data/metar.js
           if git diff --cached --quiet; then
             echo "No changes"
           else
-            git commit -m "Update METAR/TAF data"
+            git commit -m "Update METAR/TAF data (dual source)"
             git push
           fi
