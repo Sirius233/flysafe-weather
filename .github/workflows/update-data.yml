@@ -126,5 +126,7 @@ jobs:
             echo "No changes"
           else
             git commit -m "Update METAR/TAF data (dual source)"
+            # Merge any concurrent remote changes (e.g. index.html pushed via API)
+            git pull --rebase origin gh-pages || true
             git push
           fi
