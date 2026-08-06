@@ -67,6 +67,20 @@ jobs:
                   by_airport.setdefault(icao, {})['taf'] = '\n'.join(block)
 
           # Source 2: aviationweather.gov (detailed TAF with BECMG)
+          def report_time(s):
+              # All formats: "METAR/SPECI/TAF ICAO DDHHMMZ ..." -> 3rd token
+              parts = s.strip().split()
+              return parts[2] if len(parts) >= 3 else ''
+
+          def newer(existing, candidate):
+              ct = report_time(candidate)
+              et = report_time(existing)
+              if not ct:
+                  return existing
+              if not et:
+                  return candidate
+              return candidate if ct > et else existing
+
           for i in range(0, len(ICAOS), 30):
               chunk = ','.join(ICAOS[i:i + 30])
               raw = fetch(f'https://aviationweather.gov/api/data/metar?ids={chunk}&taf=true&format=raw')
@@ -78,11 +92,11 @@ jobs:
                   icao = m.group(2)
                   a = by_airport.setdefault(icao, {})
                   if m.group(1) == 'TAF':
-                      a['taf'] = line  # aviationweather TAF is more detailed
-                  elif 'metar' not in a:
+                      a['taf'] = newer(a['taf'], line) if 'taf' in a else line
+                  else:
                       metar = re.sub(r'^(METAR|SPECI)\s+', '', line)
                       if is_fresh(metar):
-                          a['metar'] = metar
+                          a['metar'] = newer(a['metar'], metar) if 'metar' in a else metar
 
           # Assemble
           out_lines = []
