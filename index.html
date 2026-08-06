@@ -144,6 +144,15 @@ body {
 /* Error */
 .error-msg { padding: 14px 18px; background: var(--red-bg); border: 1px solid #fecaca; border-radius: var(--radius-sm); color: #991b1b; font-size: 13px; }
 
+/* Health monitor banner */
+#health-banner { display: none; margin: 0 0 16px; }
+#health-banner.show { display: block; }
+.health-ok { background: var(--green-bg); border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; }
+.health-warn { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.7; }
+.health-warn .h-title { font-weight: 600; display: block; margin-bottom: 4px; }
+.health-warn ul { margin: 0; padding-left: 18px; }
+.health-time { float: right; opacity: .6; font-size: 11px; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .container { padding: 16px 12px 40px; }
@@ -171,6 +180,7 @@ body {
 </script>
 <div id="space-bg"><canvas id="stars"></canvas></div>
 <div class="container">
+  <div id="health-banner"></div>
   <div class="header">
     <div class="logo">✈️</div>
     <h1>航空气象</h1>
@@ -1041,6 +1051,98 @@ async function query() {
     setProgress(-1, '');
   }
 }
+
+// ============================================================
+// HEALTH MONITOR - checks data freshness & sources every hour
+// ============================================================
+let healthChecked = false;
+
+function getLatestMetarTime() {
+  if (!window.METAR_DATA) return null;
+  let latest = null;
+  for (const line of window.METAR_DATA.split('\n')) {
+    const m = line.match(/^(?:METAR|SPECI)\s+[A-Z]{4}\s+(\d{6}Z)/);
+    if (m && (!latest || m[1] > latest)) latest = m[1];
+  }
+  return latest;
+}
+
+function hoursSinceUtc(utcTime) {
+  const m = utcTime && utcTime.match(/^(\d{2})(\d{2})(\d{2})Z$/);
+  if (!m) return -1;
+  const day = parseInt(m[1], 10), hh = parseInt(m[2], 10), mm = parseInt(m[3], 10);
+  const now = new Date();
+  let cand = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), day, hh, mm));
+  if (cand > now) cand = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, day, hh, mm));
+  return (now - cand) / 3600000;
+}
+
+function fetchWithTimeout(url, ms) {
+  const ctrl = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? { signal: AbortSignal.timeout(ms) } : {};
+  return fetch(url, ctrl).then(r => r.ok ? 'ok' : 'http-' + r.status);
+}
+
+async function checkDataHealth(force) {
+  if (healthChecked && !force) return;
+  healthChecked = true;
+  const banner = document.getElementById('health-banner');
+  if (!banner) return;
+
+  const issues = [];
+
+  // 1. METAR data freshness (data file auto-refreshed by GitHub Actions every 10 min)
+  const latest = getLatestMetarTime();
+  if (!latest) {
+    issues.push('数据文件中未找到 METAR 报文，数据源可能异常或尚未生成。');
+  } else {
+    const h = hoursSinceUtc(latest);
+    if (h >= 0) {
+      if (h > 24) {
+        issues.push('METAR 数据严重过期（最新报文 ' + utcToBeijing(latest) + '，已超过 24 小时未更新）。自动更新机制可能已停止，请检查 GitHub Actions 运行状态。');
+      } else if (h > 3) {
+        issues.push('METAR 数据更新不及时（最新报文 ' + utcToBeijing(latest) + '，已超过 3 小时未更新）。');
+      }
+    }
+  }
+
+  // 2. Data file loadability
+  try {
+    const r = await fetchWithTimeout('data/metar.js?_=' + Date.now(), 8000);
+    if (r !== 'ok') issues.push('数据文件 data/metar.js 加载异常（' + r + '）。');
+  } catch(e) {
+    issues.push('数据文件 data/metar.js 无法加载（网络异常）。');
+  }
+
+  // 3. Live source connectivity (via CORS proxy)
+  const srcResults = await Promise.allSettled([
+    fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://aviationweather.gov/api/data/metar?ids=ZBAA'), 10000),
+    fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://tgftp.nws.noaa.gov/data/observations/metar/stations/ZBAA.TXT'), 10000)
+  ]);
+  if (srcResults[0].status === 'rejected' || srcResults[0].value !== 'ok') {
+    issues.push('实时数据源 aviationweather.gov 不可达（可能网络波动或源站故障）。');
+  }
+  if (srcResults[1].status === 'rejected' || srcResults[1].value !== 'ok') {
+    issues.push('实时数据源 NOAA tgftp 不可达（可能网络波动或源站故障）。');
+  }
+
+  // Render banner
+  const nowStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  if (issues.length > 0) {
+    banner.className = 'show';
+    banner.innerHTML = '<div class="health-warn"><span class="h-title">🔍 数据监控发现异常（' + issues.length + ' 项）</span><ul>' +
+      issues.map(i => '<li>⚠️ ' + i + '</li>').join('') +
+      '</ul><span class="health-time">检查时间 ' + nowStr + ' · 每 1 小时自动复查</span></div>';
+  } else {
+    banner.className = 'show';
+    banner.innerHTML = '<div class="health-ok">✅ 数据源正常 · 最新 METAR：' + (latest ? utcToBeijing(latest) : 'N/A') +
+      ' · 检查时间 ' + nowStr + '<span style="float:right;opacity:.6;">每 1 小时自动复查</span></div>';
+    setTimeout(() => { banner.classList.remove('show'); banner.innerHTML = ''; }, 10000);
+  }
+}
+
+// Initial check after data loads, then hourly
+setTimeout(() => checkDataHealth(false), 5000);
+setInterval(() => checkDataHealth(true), 3600000);
 
 // Initialize - preload data in background for instant queries
 preloadData();
