@@ -1,7 +1,8 @@
 name: Update METAR data
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    # Fetch at 10 and 39 minutes past every hour (aligned with METAR release cadence)
+    - cron: '10,39 * * * *'
   workflow_dispatch:
 
 permissions:
