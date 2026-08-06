@@ -1216,8 +1216,106 @@ async function checkDataHealth(force) {
   setTimeout(() => { banner.classList.remove('show'); banner.innerHTML = ''; }, 10000);
 }
 
+// ============================================================
+// ACTIVE CACHE MONITOR - checks that the hourly :10 update happened;
+// if not, actively fetches fresh METAR/TAF and caches locally (self-heal)
+// ============================================================
+const ACTIVE_CACHE_KEY = 'metar_active_cache_v2';
+let monitorRunning = false;
+
+function readActiveCache() {
+  try { return JSON.parse(localStorage.getItem(ACTIVE_CACHE_KEY) || 'null'); } catch(e) { return null; }
+}
+function writeActiveCache(raw) {
+  try {
+    const w = {};
+    // compute latest metar time inside raw
+    let latest = null;
+    for (const line of raw.split('\n')) {
+      const m = line.match(/^(?:METAR|SPECI)\s+[A-Z]{4}\s+(\d{6}Z)/);
+      if (m && (!latest || m[1] > latest)) latest = m[1];
+    }
+    localStorage.setItem(ACTIVE_CACHE_KEY, JSON.stringify({ raw: raw, latest: latest, time: Date.now() }));
+  } catch(e) {}
+}
+
+// Merge localStorage active cache into memory if it is fresher than data/metar.js
+function mergeActiveCache() {
+  const ls = readActiveCache();
+  if (!ls || !ls.raw) return false;
+  const fileLatest = getLatestMetarTime();
+  if (!fileLatest || (ls.latest && ls.latest > fileLatest)) {
+    window.METAR_DATA = ls.raw;
+    buildMetarIndex();
+    return true;
+  }
+  return false;
+}
+
+// Actively fetch fresh data for all airports via aviationweather batch API (through proxies)
+async function activeFetchAll() {
+  const airportList = CITIES.map(c => c.icao).join(',');
+  const proxyUrls = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://api.codetabs.com/v1/proxy?quest='
+  ];
+  for (const make of proxyUrls) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      const resp = await fetch(make + encodeURIComponent('https://aviationweather.gov/api/data/metar?ids=' + airportList + '&taf=true&format=raw'), { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const t = await resp.text();
+        if (t && t.trim().length > 200) return t;
+      }
+    } catch(e) {}
+  }
+  return null;
+}
+
+function showMonitorToast(html) {
+  const banner = document.getElementById('health-banner');
+  if (!banner) return;
+  banner.className = 'show';
+  banner.innerHTML = html;
+  setTimeout(() => { banner.classList.remove('show'); banner.innerHTML = ''; }, 10000);
+}
+
+// Core monitor: runs on page load + every 30 min
+async function runActiveMonitor() {
+  if (monitorRunning) return;
+  monitorRunning = true;
+  try {
+    // Effective latest METAR = max(file cache, localStorage active cache)
+    const fileLatest = getLatestMetarTime();
+    const ls = readActiveCache();
+    let effectiveLatest = fileLatest;
+    if (ls && ls.latest && (!effectiveLatest || ls.latest > effectiveLatest)) effectiveLatest = ls.latest;
+
+    const h = hoursSinceUtc(effectiveLatest);
+    // If > 2h old (the :10 hourly update has not happened twice), actively fetch
+    if (h === -1 || h > 2) {
+      const fresh = await activeFetchAll();
+      if (fresh) {
+        writeActiveCache(fresh);
+        window.METAR_DATA = fresh;
+        buildMetarIndex();
+        const newLatest = getMetarTimeFromRaw(fresh);
+        showMonitorToast('<div class="health-ok">✅ 缓存检测到过期，已主动获取最新 METAR/TAF（' + (newLatest ? utcToBeijing(newLatest) : '') + '）</div>');
+      } else {
+        showMonitorToast('<div class="health-warn">⚠️ 缓存过期且主动获取失败（数据源不可达），请稍后刷新重试</div>');
+      }
+    }
+  } finally {
+    monitorRunning = false;
+  }
+}
+
 // Initial check right after data is ready, then hourly
 setInterval(() => checkDataHealth(true), 3600000);
+setInterval(() => runActiveMonitor(), 1800000);
 
 // Initialize - preload data in background for instant queries
 function preloadData() {
@@ -1231,8 +1329,12 @@ function preloadData() {
     if (window.AIRPORTS && CITIES.length === 0) {
       CITIES = window.AIRPORTS;
     }
+    // Merge any localStorage active cache that is fresher than the data file
+    mergeActiveCache();
     // Run health check immediately once data files are loaded
     checkDataHealth(false);
+    // Run the active monitor (detects missed :10 updates and self-heals)
+    runActiveMonitor();
   }).catch(() => {
     // Even if data failed to load, run the check to surface the error
     checkDataHealth(false);
