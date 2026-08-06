@@ -229,14 +229,19 @@ const NMC_NAMES = {
 // ADVERSE WEATHER ANALYSIS (loaded from data/adverse-weather.js)
 // ============================================================
 const WEATHER_SECTIONS = {
-  TS: { kw: ['TS','TSRA','-TSRA','+TSRA','RETS','CB','SHRA','-SHRA','+SHRA','RA','-RA','+RA','DZ','-DZ','+DZ','SN','-SN','+SN','SG','GS','PL','GR','SQ','VCTS','VCSH'], title: '雷暴/降水', section: '二、雷暴', endSection: /^三、/m },
+  TS: { kw: ['TS','TSRA','-TSRA','+TSRA','RETS','CB','TCU','GR','SQ','VCTS','VCSH'], title: '雷暴/强对流', section: '二、雷暴', endSection: /^三、/m },
   TURB: { kw: ['TURB'], title: '颠簸', section: '三、', endSection: /^四、/m },
   WS: { kw: ['WS','WIND SHEAR'], title: '风切变', section: '四、', endSection: /^五、/m },
-  FG: { kw: ['BR','FG','MIFG','BCFG','PRFG','HZ','FU','DU','SA','VA'], title: '低能见度', section: '五、', endSection: /^六、/m },
-  ICE: { kw: ['ICE','FZDZ','FZRA','FZFG','BLSN','BLSA','BLDU'], title: '结冰/寒冷天气', section: '六、', endSection: /^七、/m },
+  FG: { kw: ['FG','MIFG','BCFG','PRFG','BR','HZ','FU'], title: '低能见度', section: '五、', endSection: /^六、/m },
+  ICE: { kw: ['ICE','FZDZ','FZRA','FZFG','BLSN','BLSA','BLDU','DRSN','DRSA','DRDU','SN','SG','GS','PL','IC'], title: '结冰/寒冷天气', section: '六、', endSection: /^七、/m },
+  RWY: { kw: ['RVR\\d{2,4}', 'R\\d{2}[LRC]?[/\\\\]\\d'], title: '湿/污染道面', section: '七、湿', endSection: /^八、/m },
+  WIND: { kw: ['\\d{2,5}G\\d{2,3}(MPS|KT)'], title: '大风/乱流', section: '八、大风', endSection: /^九、/m },
+  RAIN: { kw: ['RA','-RA','+RA','DZ','-DZ','+DZ','SHRA','-SHRA','+SHRA','SHSN','SHGS','SHGR'], title: '雨中进近和着陆', section: '九、雨中', endSection: /^十、/m },
+  SAND: { kw: ['DS','SS','DU','SA','BLDU','BLSA','PO','FC','FC-'], title: '风沙浮尘', section: '十、风沙', endSection: /^十一、/m },
+  ASH: { kw: ['VA'], title: '火山灰', section: '十一、火山灰', endSection: /^十二、/m },
   COLDTEMP: { kw: ['FZDZ','FZRA','FZFG'], title: '低温条件的高度表修正', section: '十二、低温', endSection: null },
 };
-const dangerKeywords = ['+TSRA','+SHRA','GR','SQ'];
+const dangerKeywords = ['+TSRA','+SHRA','+RA','+SN','+DZ','GR','SQ','FZRA','FZDZ'];
 
 function getWeatherDoc() {
   let doc = window.ADVERSE_WEATHER || '';
@@ -254,16 +259,19 @@ function extractSection(doc, startMarker, endRegex) {
   return rest;
 }
 
+// keyword can contain regex tokens (e.g. \d) - escape only + / - literals
+function kwRegex(kw) {
+  const escaped = kw.replace(/\+/g, '\\+').replace(/-/g, '\\-');
+  return new RegExp('(^|\\s)' + escaped + '(\\s|$)', 'i');
+}
+
 function detectWeather(raw) {
   if (!raw) return [];
   const upper = raw.toUpperCase();
   const hits = [];
   const seen = new Set();
   for (const [key, cfg] of Object.entries(WEATHER_SECTIONS)) {
-    const matched = cfg.kw.some(kw => {
-      const re = new RegExp('(^|\\s)' + kw.replace(/[+#-]/g, '\\$&') + '(\\s|$)', 'i');
-      return re.test(upper);
-    });
+    const matched = cfg.kw.some(kw => kwRegex(kw).test(upper));
     if (matched && !seen.has(key)) {
       seen.add(key);
       const doc = getWeatherDoc();
@@ -1060,6 +1068,23 @@ async function query() {
             const doc = getWeatherDoc();
             const content = extractSection(doc, '十二、低温', null);
             weatherHits.push({ name: '低温条件的高度表修正', content: content || '（文档未加载）' });
+          }
+        }
+      }
+
+      // Strong wind trigger: mean >= 10m/s(20kt) or gust >= 15m/s(30kt)
+      if (metarFields && metarFields.wind) {
+        const wm = metarFields.wind.match(/(\d{2,3})(?:G(\d{2,3}))?(MPS|KT)/);
+        if (wm && !weatherHits.find(h => h.name.includes('大风'))) {
+          const speed = parseInt(wm[1], 10);
+          const gust = wm[2] ? parseInt(wm[2], 10) : 0;
+          const isMps = wm[3] === 'MPS';
+          const spTh = isMps ? 10 : 20;
+          const guTh = isMps ? 15 : 30;
+          if (speed >= spTh || gust >= guTh) {
+            const doc = getWeatherDoc();
+            const content = extractSection(doc, '八、大风', /^九、/m);
+            weatherHits.push({ name: '大风/乱流', content: content || '（文档未加载）' });
           }
         }
       }
