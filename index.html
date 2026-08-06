@@ -144,8 +144,8 @@ body {
 /* Error */
 .error-msg { padding: 14px 18px; background: var(--red-bg); border: 1px solid #fecaca; border-radius: var(--radius-sm); color: #991b1b; font-size: 13px; }
 
-/* Health monitor banner - floating toast, never obscured */
-#health-banner { display: none; position: fixed; top: 12px; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 620px; z-index: 9999; margin: 0; }
+/* Health monitor banner - floating toast at bottom, auto-hides */
+#health-banner { display: none; position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 620px; z-index: 9999; margin: 0; }
 #health-banner.show { display: block; }
 .health-ok { background: var(--green-bg); border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; box-shadow: var(--shadow-lg); }
 .health-warn { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.7; box-shadow: var(--shadow-lg); max-height: 70vh; overflow-y: auto; }
@@ -1113,7 +1113,7 @@ async function checkDataHealth(force) {
     issues.push('实时数据源 NOAA tgftp 不可达（可能网络波动或源站故障）。');
   }
 
-  // Render banner
+  // Render banner (auto-hides after 10s in both cases)
   const nowStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   const closeBtn = '<button class="health-close" onclick="this.closest(\'#health-banner\').className=\'\';this.closest(\'#health-banner\').innerHTML=\'\'">✕</button>';
   if (issues.length > 0) {
@@ -1125,8 +1125,8 @@ async function checkDataHealth(force) {
     banner.className = 'show';
     banner.innerHTML = '<div class="health-ok">✅ 数据源正常 · 最新 METAR：' + (latest ? utcToBeijing(latest) : 'N/A') +
       ' · 检查时间 ' + nowStr + '<span style="opacity:.6;float:right;">每 1 小时自动复查</span></div>';
-    setTimeout(() => { banner.classList.remove('show'); banner.innerHTML = ''; }, 10000);
   }
+  setTimeout(() => { banner.classList.remove('show'); banner.innerHTML = ''; }, 10000);
 }
 
 // Initial check right after data is ready, then hourly
