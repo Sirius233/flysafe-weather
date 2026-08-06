@@ -399,21 +399,6 @@ function loadScript(src) {
   });
 }
 
-// Preload all data in parallel on page load
-function preloadData() {
-  const t = Date.now();
-  const jobs = [];
-  if (!window.AIRPORTS) jobs.push(loadScript('data/airports.js?_=' + t));
-  if (!window.METAR_DATA) jobs.push(loadScript('data/metar.js?_=' + t));
-  if (!window.ADVERSE_WEATHER) jobs.push(loadScript('data/adverse-weather.js?_=' + t));
-  Promise.all(jobs).then(() => {
-    buildMetarIndex();
-    if (window.AIRPORTS && CITIES.length === 0) {
-      CITIES = window.AIRPORTS;
-    }
-  }).catch(() => {});
-}
-
 async function fetchMetar(icao) {
   try {
     if (!window.METAR_DATA) await loadScript('data/metar.js?_=' + Date.now());
@@ -1140,11 +1125,28 @@ async function checkDataHealth(force) {
   }
 }
 
-// Initial check after data loads, then hourly
-setTimeout(() => checkDataHealth(false), 5000);
+// Initial check right after data is ready, then hourly
 setInterval(() => checkDataHealth(true), 3600000);
 
 // Initialize - preload data in background for instant queries
+function preloadData() {
+  const t = Date.now();
+  const jobs = [];
+  if (!window.AIRPORTS) jobs.push(loadScript('data/airports.js?_=' + t));
+  if (!window.METAR_DATA) jobs.push(loadScript('data/metar.js?_=' + t));
+  if (!window.ADVERSE_WEATHER) jobs.push(loadScript('data/adverse-weather.js?_=' + t));
+  Promise.all(jobs).then(() => {
+    buildMetarIndex();
+    if (window.AIRPORTS && CITIES.length === 0) {
+      CITIES = window.AIRPORTS;
+    }
+    // Run health check immediately once data files are loaded
+    checkDataHealth(false);
+  }).catch(() => {
+    // Even if data failed to load, run the check to surface the error
+    checkDataHealth(false);
+  });
+}
 preloadData();
 
 // ============================================================
