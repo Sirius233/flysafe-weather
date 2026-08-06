@@ -147,6 +147,9 @@ body {
 /* Health monitor banner - floating toast at bottom, auto-hides */
 #health-banner { display: none; position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 620px; z-index: 9999; margin: 0; }
 #health-banner.show { display: block; }
+
+/* Stale data note under METAR/TAF titles */
+.data-stale-note { font-size: 11px; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 5px 10px; margin: 4px 0 10px; display: inline-block; line-height: 1.6; }
 .health-ok { background: var(--green-bg); border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; box-shadow: var(--shadow-lg); }
 .health-warn { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.7; box-shadow: var(--shadow-lg); max-height: 70vh; overflow-y: auto; }
 .health-warn .h-title { font-weight: 600; display: block; margin-bottom: 4px; }
@@ -402,18 +405,18 @@ function loadScript(src) {
   });
 }
 
-async function fetchMetar(icao) {
-  try {
-    if (!window.METAR_DATA) await loadScript('data/metar.js?_=' + Date.now());
-    if (!window.ADVERSE_WEATHER) await loadScript('data/adverse-weather.js?_=' + Date.now());
-    buildMetarIndex();
-    if (METAR_INDEX && METAR_INDEX[icao]) return METAR_INDEX[icao].join('\n');
-    if (window.METAR_DATA) {
-      const lines = window.METAR_DATA.split('\n').filter(l => l.includes(icao) && l.trim());
-      if (lines.length > 0) return lines.join('\n');
-    }
-  } catch(e) {}
-  // ---- Live multi-source fallback (when local cache misses) ----
+// Extract the METAR issue time (DDHHMMZ) from raw text
+function getMetarTimeFromRaw(raw) {
+  const parsed = parseMetar(raw);
+  if (parsed && parsed.metar) {
+    const mf = extractMetarFields(parsed.metar);
+    return mf ? mf.time : null;
+  }
+  return null;
+}
+
+// Live fetch from aviationweather.gov + NOAA (with CORS proxies)
+async function tryLiveFetch(icao) {
   // Source 1: aviationweather.gov direct
   try {
     const resp = await fetch('https://aviationweather.gov/api/data/metar?ids=' + icao + '&taf=true');
@@ -460,6 +463,34 @@ async function fetchMetar(icao) {
       }
     } catch(e) {}
   }
+  return null;
+}
+
+async function fetchMetar(icao) {
+  let local = null;
+  try {
+    if (!window.METAR_DATA) await loadScript('data/metar.js?_=' + Date.now());
+    if (!window.ADVERSE_WEATHER) await loadScript('data/adverse-weather.js?_=' + Date.now());
+    buildMetarIndex();
+    if (METAR_INDEX && METAR_INDEX[icao]) local = METAR_INDEX[icao].join('\n');
+    else if (window.METAR_DATA) {
+      const lines = window.METAR_DATA.split('\n').filter(l => l.includes(icao) && l.trim());
+      if (lines.length > 0) local = lines.join('\n');
+    }
+  } catch(e) {}
+
+  // If local data is missing or stale (>1h), try to fetch the freshest live report
+  const localTime = local ? getMetarTimeFromRaw(local) : null;
+  const isStale = !local || (localTime && hoursSinceUtc(localTime) > 1);
+  if (isStale) {
+    const live = await tryLiveFetch(icao);
+    if (live) {
+      const liveTime = getMetarTimeFromRaw(live);
+      // Use live data if it is fresher than local
+      if (!local || !liveTime || !localTime || liveTime > localTime) return live;
+    }
+  }
+  if (local) return local;
   throw new Error('所有数据源均无法获取 ' + icao + ' 的报文');
 }
 
@@ -751,6 +782,15 @@ function statusDot(level) {
   return '<span class="status-dot status-green"></span>';
 }
 
+// Stale-data note shown under METAR/TAF titles when report is older than 1h
+function staleNote(utcTime) {
+  const h = hoursSinceUtc(utcTime);
+  if (h >= 0 && h > 1) {
+    return '<div class="data-stale-note">⚠️ 更新时间：' + utcToBeijing(utcTime) + '（已过 ' + Math.round(h) + ' 小时，非最新报文）</div>';
+  }
+  return '';
+}
+
 // ============================================================
 // RENDER
 // ============================================================
@@ -789,6 +829,7 @@ function renderAirportSection(city, metarFields, tafData, weatherHits, isDual, a
   } else {
     // METAR
     html += '<h3>📡 METAR 报</h3>';
+    html += staleNote(metarFields.time);
     html += '<div class="code-block">' + metarFields.raw + '</div>';
 
     // Parsed analysis
@@ -809,6 +850,7 @@ function renderAirportSection(city, metarFields, tafData, weatherHits, isDual, a
     // TAF
     if (tafData) {
       html += '<h3>📋 TAF 报</h3>';
+      html += staleNote(tafData.issueTime);
       html += '<div class="code-block">' + tafData.raw + '</div>';
 
       html += '<table class="taf-table">';
