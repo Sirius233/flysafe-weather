@@ -1174,8 +1174,8 @@ async function checkDataHealth(force) {
     if (h >= 0) {
       if (h > 24) {
         issues.push('METAR 数据严重过期（最新报文 ' + utcToBeijing(latest) + '，已超过 24 小时未更新）。自动更新机制可能已停止，请检查 GitHub Actions 运行状态。');
-      } else if (h > 2) {
-        issues.push('METAR 数据更新不及时（最新报文 ' + utcToBeijing(latest) + '，已超过 2 小时未更新）。');
+      } else if (h > 1) {
+        issues.push('METAR 数据更新不及时（最新报文 ' + utcToBeijing(latest) + '，已超过 1 小时未更新）。');
       }
     }
   }
@@ -1295,8 +1295,8 @@ async function runActiveMonitor() {
     if (ls && ls.latest && (!effectiveLatest || ls.latest > effectiveLatest)) effectiveLatest = ls.latest;
 
     const h = hoursSinceUtc(effectiveLatest);
-    // If > 2h old (the :10 hourly update has not happened twice), actively fetch
-    if (h === -1 || h > 2) {
+    // METAR is released hourly; if the cache is >1h old the :10 update was missed -> actively fetch
+    if (h === -1 || h > 1) {
       const fresh = await activeFetchAll();
       if (fresh) {
         writeActiveCache(fresh);
@@ -1313,9 +1313,9 @@ async function runActiveMonitor() {
   }
 }
 
-// Initial check right after data is ready, then hourly
+// Initial check right after data is ready, then frequent re-checks
 setInterval(() => checkDataHealth(true), 3600000);
-setInterval(() => runActiveMonitor(), 1800000);
+setInterval(() => runActiveMonitor(), 900000); // every 15 min
 
 // Initialize - preload data in background for instant queries
 function preloadData() {
